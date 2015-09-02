@@ -1,12 +1,14 @@
 class Board
-  attr_accessor :cells, :live_cells
+  attr_accessor :cells, :live_cells, :rows, :columns
 
-  def initialize
+  def initialize(rows, columns)
+    @rows = rows
+    @columns = columns
     @cells = []
-    (1..10).each do |row|
+    (1..rows).each do |row|
       row = []
-      (1..10).each do |marker|
-        row << Cell.new(marker)
+      (1..columns).each do |_|
+        row << Cell.new
       end
       @cells << row
     end
@@ -15,22 +17,24 @@ class Board
   def starting_position
     @live_cells = []
 
-    (0..99).to_a.sample.times do
-      x = (0..9).to_a.sample
-      y = (0..9).to_a.sample
+    rand((rows * columns) - 1).times do
+      x, y = rand(rows - 1), rand(columns - 1)
       @live_cells << [x, y]
-    end
-
-    @live_cells.each do |cell|
-      cells[cell[0]][cell[1]].marker = "O"
+      cells[x][y].set_alive!
     end
   end
 
-  def print_board
+  def print
     system "clear"
+    puts "~" * columns * 2
     cells.each do |row|
-      puts "#{row[0].marker} #{row[1].marker} #{row[2].marker} #{row[3].marker} #{row[4].marker} #{row[5].marker} #{row[6].marker} #{row[7].marker} #{row[8].marker} #{row[9].marker}"
+      line = ""
+      row.each do |cell|
+        line << cell.marker + " "
+      end
+      puts line
     end
+    puts "~" * columns * 2
   end
 
   def process_a_round
@@ -38,14 +42,14 @@ class Board
     to_create = []
     cells.each_with_index do |row, x|
       row.each_with_index do |cell, y|
-        if cell.marker == "O"
+        if cell.alive?
           count = number_of_live_neighbors(x, y)
           if count > 3 || count < 2
             to_die << cell
           end
         end
 
-        if cell.marker == "-"
+        if !cell.alive?
           count = number_of_live_neighbors(x, y)
           if count == 3
             to_create << cell
@@ -58,107 +62,70 @@ class Board
 
   def cell_cycle(to_die, to_create)
     to_die.each do |cell|
-      cell.marker = "-"
+      cell.kill!
     end
 
     to_create.each do |cell|
-      cell.marker = "O"
+      cell.set_alive!
     end
   end
 
   def number_of_live_neighbors(x, y)
-    count = 0
-    if x != 9
-      if cells[x + 1][y].marker == "O"
-        count += 1
-      end
-    end
-
-    if y != 9
-      if cells[x][y + 1].marker == "O"
-        count += 1
-      end
-    end
-
-    if x != 0
-      if cells[x - 1][y].marker == "O"
-        count += 1
-      end
-    end
-
-    if y != 0
-      if cells[x][y - 1].marker == "O"
-        count += 1
-      end
-    end
-
-    if x != 9 && y != 9
-      if cells[x + 1][y + 1].marker == "O"
-        count += 1
-      end
-    end
-
-    if x != 0 && y != 0
-      if cells[x - 1][y - 1].marker == "O"
-        count += 1
-      end
-    end
-
-    if x != 9 && y != 0
-      if cells[x + 1][y - 1].marker == "O"
-        count += 1
-      end
-    end
-
-    if x != 0 && y != 9
-      if cells[x - 1][y + 1].marker == "O"
-        count += 1
-      end
-    end
-
-    count
+    neighbor_coordinates = [[x-1, y-1], [x, y-1], [x+1, y-1], [x-1, y], [x+1, y], [x-1, y+1], [x, y+1], [x+1, y+1]].select {| (x, y) | x >=0 && y >=0 && x < rows && y < columns}
+    neighbor_coordinates.reduce(0) {|accu, (a, b)| accu += cells[a][b].value}
   end
+
+  def all_dead
+    living_cells = []
+    cells.each do |row|
+      row.each do |cell|
+        living_cells << cell if cell.value == 1
+      end
+    end
+    living_cells == []
+  end
+
 end
 
 class Cell
-  attr_accessor :marker
+  attr_accessor :marker, :y, :x, :value
 
-  def initialize(marker)
-    @marker = "-"
+  def initialize
+    @marker = " "
+    @value = 0
+  end
+
+  def alive?
+    @value == 1
+  end
+
+  def set_alive!
+    @value = 1
+    @marker = "O"
+  end
+
+  def kill!
+    @value = 0
+    @marker = " "
   end
 end
 
 class Game
   def start
-    welcome_message
-    @board = Board.new
+    @board = Board.new(100,100)
     @board.starting_position
     loop do
-      @board.print_board
+      @board.print
       @board.process_a_round
-      sleep(1)
-      break if all_dead
+      sleep(0.1)
+      break if @board.all_dead
     end
-    @board.print_board
+    @board.print
     goodbye_message
-  end
-
-  def welcome_message
-    puts "Welcome to Conway's The Game of Life!"
   end
 
   def goodbye_message
     puts "Looks like all your cells died. Too bad!"
-  end
-
-  def all_dead
-    living_cells = []
-    @board.cells.each do |row|
-      row.each do |cell|
-        living_cells << cell if cell.marker == "O"
-      end
-    end
-    true if living_cells == []
   end
 end
 
